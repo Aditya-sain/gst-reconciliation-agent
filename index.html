@@ -53,7 +53,7 @@
           <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Upload Both Files (Any Order - System Auto-Detects)
         </h2>
         <span class="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-          <i class="fa-solid fa-magic mr-1"></i> Smart Auto-Detection Active
+          <i class="fa-solid fa-magic mr-1"></i> Smart File & Tax Head Detection Active
         </span>
       </div>
 
@@ -77,11 +77,23 @@
 
       <!-- Controls Row -->
       <div class="mt-4 pt-3 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-4 text-xs font-medium text-slate-700">
-          <span>Tax Mode:</span>
+        <div class="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-700">
+          <span class="font-bold text-slate-900">Tax Head:</span>
           <label class="inline-flex items-center gap-1.5 cursor-pointer">
-            <input type="radio" name="taxMode" value="igst" checked class="text-indigo-600">
-            <span>IGST</span>
+            <input type="radio" name="taxMode" value="auto" checked class="text-indigo-600">
+            <span class="text-indigo-700 font-bold">Auto-Detect</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="cgst" class="text-indigo-600">
+            <span>CGST (Central)</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="sgst" class="text-indigo-600">
+            <span>SGST (State)</span>
+          </label>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="igst" class="text-indigo-600">
+            <span>IGST (Inter-State)</span>
           </label>
           <label class="inline-flex items-center gap-1.5 cursor-pointer">
             <input type="radio" name="taxMode" value="cgst_sgst" class="text-indigo-600">
@@ -91,6 +103,8 @@
             <input type="radio" name="taxMode" value="total" class="text-indigo-600">
             <span>Total Tax</span>
           </label>
+
+          <span id="detectedBadge" class="hidden text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-semibold border border-indigo-200"></span>
         </div>
 
         <button onclick="processUploadedFiles()" id="reconcileBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-lg text-xs shadow transition flex items-center gap-2">
@@ -146,7 +160,7 @@
               <tr>
                 <th class="py-2.5 px-3 w-10 text-center">#</th>
                 <th class="py-2.5 px-3">Company Name</th>
-                <th class="py-2.5 px-3">Invoice / Vch No</th>
+                <th class="py-2.5 px-3">Invoice / Voucher No</th>
                 <th class="py-2.5 px-3">Date</th>
                 <th class="py-2.5 px-3 text-right">Tax in 2B (₹)</th>
                 <th class="py-2.5 px-3 text-right">Tax in Books (₹)</th>
@@ -204,83 +218,89 @@
       s = s.replace(/\((PUNJAB|PB|HARYANA|HRY|DELHI|DL|CHANDIGARH|CHD|MOHALI)\)/gi, '');
       
       const terms = [
-        /\\bPRIVATE\\s+LIMITED\\b/gi, /\\bPVT\\.?\\s*LTD\\.?\\b/gi, /\\bLIMITED\\b/gi, /\\bLTD\\.?\\b/gi,
-        /\\bLLP\\b/gi, /\\bINC\\.?\\b/gi, /\\bCORP\\.?\\b/gi, /\\bCORPORATION\\b/gi, /\\bCO\\.?\\b/gi,
-        /\\bSERVICES\\b/gi, /\\bSOLUTIONS\\b/gi, /\\bENTERPRISES\\b/gi, /\\bTRADERS\\b/gi
+        /\bPRIVATE\s+LIMITED\b/gi, /\bPVT\.?\s*LTD\.?\b/gi, /\bLIMITED\b/gi, /\bLTD\.?\b/gi,
+        /\bLLP\b/gi, /\bINC\.?\b/gi, /\bCORP\.?\b/gi, /\bCORPORATION\b/gi, /\bCO\.?\b/gi,
+        /\bSERVICES\b/gi, /\bSOLUTIONS\b/gi, /\bENTERPRISES\b/gi, /\bTRADERS\b/gi
       ];
       for (const t of terms) s = s.replace(t, '');
-      s = s.replace(/[^A-Z0-9\\s]/g, ' ');
-      return s.replace(/\\s+/g, ' ').trim();
+      s = s.replace(/[^A-Z0-9\s]/g, ' ');
+      return s.replace(/\s+/g, ' ').trim();
     }
 
     function cleanInvoiceNo(inv) {
       if (!inv || typeof inv !== 'string') return '';
-      return inv.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      let s = inv.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      // Strip common ERP prefixes like FB on FBADS...
+      if (s.startsWith('FBADS')) s = s.substring(2);
+      return s;
     }
 
     // Inspects a workbook to determine if it is GSTR-2B or Tally
     function identifyWorkbookType(wb) {
-      let isGSTR2B = false;
-      let isTally = false;
-
-      // Check sheet names first
       for (const sheet of wb.SheetNames) {
         const sLower = sheet.toLowerCase();
-        if (sLower.includes('b2b') || sLower.includes('gstr2b') || sLower.includes('2b')) {
-          isGSTR2B = true;
-          break;
-        }
+        if (sLower === 'b2b' || (sLower.startsWith('b2b') && !sLower.includes('cdnr'))) return 'GSTR2B';
       }
 
-      // Check row contents across sheets
       for (const sheet of wb.SheetNames) {
         const ws = wb.Sheets[sheet];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         for (let i = 0; i < Math.min(rows.length, 30); i++) {
           const str = rows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (str.includes('gstin of supplier') || str.includes('gstin') && str.includes('trade')) {
-            isGSTR2B = true;
-          }
-          if (str.includes('particular') && (str.includes('debit') || str.includes('vch') || str.includes('credit'))) {
-            isTally = true;
-          }
+          if (str.includes('gstin of supplier') || (str.includes('gstin') && str.includes('trade'))) return 'GSTR2B';
+          if (str.includes('input cgst') || str.includes('input sgst') || str.includes('input igst')) return 'TALLY';
+          if (str.includes('particular') && (str.includes('debit') || str.includes('vch') || str.includes('credit'))) return 'TALLY';
         }
       }
+      return 'UNKNOWN';
+    }
 
-      if (isGSTR2B && !isTally) return 'GSTR2B';
-      if (isTally && !isGSTR2B) return 'TALLY';
-      return isGSTR2B ? 'GSTR2B' : (isTally ? 'TALLY' : 'UNKNOWN');
+    function autoDetectTaxModeFromWorkbook(wb) {
+      let allText = wb.SheetNames.join(' ').toLowerCase();
+      for (const sheet of wb.SheetNames) {
+        const ws = wb.Sheets[sheet];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        for (let i = 0; i < Math.min(rows.length, 20); i++) {
+          allText += ' ' + rows[i].map(c => String(c).toLowerCase()).join(' ');
+        }
+      }
+      if (allText.includes('input cgst') || allText.includes('cgst 9%') || (allText.includes('cgst') && !allText.includes('sgst') && !allText.includes('igst'))) return 'cgst';
+      if (allText.includes('input sgst') || allText.includes('sgst 9%') || (allText.includes('sgst') && !allText.includes('cgst') && !allText.includes('igst'))) return 'sgst';
+      if (allText.includes('input igst') || allText.includes('igst 18%') || (allText.includes('igst') && !allText.includes('cgst') && !allText.includes('sgst'))) return 'igst';
+      if (allText.includes('cgst') && allText.includes('sgst')) return 'cgst_sgst';
+      return 'igst';
     }
 
     function parseGSTR2BFromWorkbook(wb, mode) {
-      // Find sheet that contains B2B or GSTIN table
       let targetSheetName = null;
       let targetRows = null;
       let headerIdx = -1;
 
       for (const sheet of wb.SheetNames) {
-        const ws = wb.Sheets[sheet];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-        for (let i = 0; i < Math.min(rows.length, 40); i++) {
-          const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
-          if (rowStr.includes('gstin of supplier') || (rowStr.includes('gstin') && rowStr.includes('trade'))) {
-            targetSheetName = sheet;
-            targetRows = rows;
-            headerIdx = i;
-            break;
+        const sLower = sheet.toLowerCase();
+        if (sLower === 'b2b' || (sLower.startsWith('b2b') && !sLower.includes('cdnr'))) {
+          const ws = wb.Sheets[sheet];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          for (let i = 0; i < Math.min(rows.length, 30); i++) {
+            const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
+            if (rowStr.includes('gstin of supplier') || (rowStr.includes('gstin') && rowStr.includes('trade'))) {
+              targetSheetName = sheet;
+              targetRows = rows;
+              headerIdx = i;
+              break;
+            }
           }
         }
         if (targetSheetName) break;
       }
 
-      // Fallback: search for columns like Invoice number, Integrated Tax, Central Tax
       if (!targetSheetName) {
         for (const sheet of wb.SheetNames) {
           const ws = wb.Sheets[sheet];
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
           for (let i = 0; i < Math.min(rows.length, 40); i++) {
             const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
-            if (rowStr.includes('integrated tax') || rowStr.includes('central tax') || (rowStr.includes('taxable') && rowStr.includes('invoice'))) {
+            if (rowStr.includes('gstin of supplier') || (rowStr.includes('gstin') && rowStr.includes('trade'))) {
               targetSheetName = sheet;
               targetRows = rows;
               headerIdx = i;
@@ -298,10 +318,8 @@
       const rows = targetRows;
       const records = [];
 
-      // Detect column indices from header row(s)
       let gstinCol = 0, nameCol = 1, invCol = 2, dateCol = 4, igstCol = 9, cgstCol = 10, sgstCol = 11;
 
-      // Scan header row for exact column headers if present
       const hRow = rows[headerIdx].map(c => String(c).toLowerCase().trim());
       hRow.forEach((c, idx) => {
         if (c.includes('gstin')) gstinCol = idx;
@@ -313,7 +331,6 @@
         if (c.includes('state') || c.includes('sgst')) sgstCol = idx;
       });
 
-      // Also check subheader row (headerIdx + 1)
       if (headerIdx + 1 < rows.length) {
         const subRow = rows[headerIdx + 1].map(c => String(c).toLowerCase().trim());
         subRow.forEach((c, idx) => {
@@ -331,12 +348,13 @@
         return isNaN(n) ? 0.0 : n;
       };
 
-      for (let i = headerIdx + 2; i < rows.length; i++) {
+      for (let i = headerIdx + 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r.length < 5) continue;
         const firstCell = String(r[gstinCol] || r[0] || '').trim();
         if (['amendments', 'goods and services tax', 'table', 'summary'].some(t => firstCell.toLowerCase().includes(t))) break;
         if (!firstCell) continue;
+        if (firstCell.length !== 15 && !(firstCell.length >= 2 && !isNaN(firstCell.substring(0, 2)))) continue;
 
         const gstin = String(r[gstinCol] || '').trim();
         const tradeName = String(r[nameCol] || '').trim();
@@ -348,7 +366,10 @@
         const sgst = parseNum(r[sgstCol]);
 
         let targetTax = igst;
-        if (mode === 'cgst_sgst') targetTax = cgst + sgst;
+        if (mode === 'cgst') targetTax = cgst;
+        else if (mode === 'sgst') targetTax = sgst;
+        else if (mode === 'igst') targetTax = igst;
+        else if (mode === 'cgst_sgst') targetTax = cgst + sgst;
         else if (mode === 'total') targetTax = igst + cgst + sgst;
 
         if (targetTax !== 0) {
@@ -360,7 +381,7 @@
             invoice_no: invNo,
             invoice_no_clean: cleanInvoiceNo(invNo),
             date: invDate,
-            tax: targetTax
+            tax: Math.round(targetTax * 100) / 100
           });
         }
       }
@@ -388,7 +409,6 @@
       }
 
       if (!targetSheetName || headerIdx === -1) {
-        // Fallback to first sheet
         targetRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
         for (let i = 0; i < Math.min(targetRows.length, 30); i++) {
           const rowStr = targetRows[i].map(c => String(c).toLowerCase()).join(' ');
@@ -423,32 +443,35 @@
       for (let i = headerIdx + 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r.length < 3) continue;
-        const rowStr = r.map(c => String(c).toLowerCase()).join(' ');
-        if (rowStr.includes('opening balance') || rowStr.includes('closing balance')) continue;
+        const rowText = r.map(c => String(c).toLowerCase()).join(' ');
+        if (['opening balance', 'closing balance', 'grand total'].some(t => rowText.includes(t))) continue;
 
-        let pIdx = colMap['particulars'] !== undefined ? colMap['particulars'] : 1;
+        const date = String(r[colMap['date'] !== undefined ? colMap['date'] : 0] || '').trim();
+        const pIdx = colMap['particulars'] !== undefined ? colMap['particulars'] : 1;
         let party = String(r[pIdx] || '').trim();
         if ((party === 'Dr' || party === 'Cr') && r[pIdx + 1]) {
-          party = String(r[pIdx + 1] || '').trim();
+          party = String(r[pIdx + 1]).trim();
         }
+
         if (!party || party.toLowerCase() === 'total' || party.toLowerCase() === 'grand total') continue;
 
-        const date = String(r[colMap['date']] || '').trim();
-        const vchType = String(r[colMap['vch_type']] || '').trim();
-        const vchNo = String(r[colMap['vch_no']] || '').trim();
-        const debit = parseNum(r[colMap['debit']]);
-        const credit = parseNum(r[colMap['credit']]);
+        const vchType = String(r[colMap['vch_type'] !== undefined ? colMap['vch_type'] : 3] || '').trim();
+        const vchNo = String(r[colMap['vch_no'] !== undefined ? colMap['vch_no'] : 4] || '').trim();
+        const debit = parseNum(r[colMap['debit'] !== undefined ? colMap['debit'] : 5]);
+        const credit = parseNum(r[colMap['credit'] !== undefined ? colMap['credit'] : 6]);
 
         const isCredit = (credit > 0 && debit === 0);
-        const taxAmount = debit > 0 ? debit : -credit;
+        const taxAmount = isCredit ? -credit : debit;
 
         records.push({
           id: i,
-          date,
+          date: date.substring(0, 10),
           party_name: party,
           party_norm: normalizePartyName(party),
           vch_type: vchType,
+          invoice_no: vchNo,
           vch_no: vchNo,
+          invoice_no_clean: cleanInvoiceNo(vchNo),
           vch_no_clean: cleanInvoiceNo(vchNo),
           debit,
           credit,
@@ -464,14 +487,20 @@
       const matched2b = new Set();
       const allRows = [];
 
-      // Pass 1: Match by Invoice Number + Amount
+      // Pass 1: Match by Invoice Number (Exact or Suffix) + Amount
       df2b.forEach(r2 => {
         const invClean = r2.invoice_no_clean;
         if (!invClean) return;
         for (let j = 0; j < dfTally.length; j++) {
-          if (tallyUsed.has(j)) continue;
+          if (tallyUsed.has(j) || dfTally[j].tax <= 0) continue;
           const rt = dfTally[j];
-          if (rt.vch_no_clean && invClean === rt.vch_no_clean && Math.abs(r2.tax - rt.debit) <= tolerance) {
+          const rtClean = rt.invoice_no_clean;
+          const isMatch = (invClean === rtClean) || (
+            invClean.length >= 6 && rtClean.length >= 6 && (
+              invClean.endsWith(rtClean) || rtClean.endsWith(invClean)
+            )
+          );
+          if (isMatch && Math.abs(r2.tax - rt.debit) <= tolerance) {
             tallyUsed.add(j);
             matched2b.add(r2.id);
             allRows.push({
@@ -489,26 +518,40 @@
         }
       });
 
-      // Pass 2: Match by Party + Amount
+      // Pass 2: Match by Party + Amount ONLY IF (party, tax) is unique on both sides
+      const gCounts = {};
+      df2b.filter(r => !matched2b.has(r.id)).forEach(r => {
+        const key = `${r.party_norm}_${r.tax}`;
+        gCounts[key] = (gCounts[key] || 0) + 1;
+      });
+      const bCounts = {};
+      dfTally.filter((r, j) => !tallyUsed.has(j) && r.tax > 0).forEach(r => {
+        const key = `${r.party_norm}_${r.debit}`;
+        bCounts[key] = (bCounts[key] || 0) + 1;
+      });
+
       df2b.forEach(r2 => {
         if (matched2b.has(r2.id)) return;
-        for (let j = 0; j < dfTally.length; j++) {
-          if (tallyUsed.has(j)) continue;
-          const rt = dfTally[j];
-          if (r2.party_norm === rt.party_norm && Math.abs(r2.tax - rt.debit) <= tolerance) {
-            tallyUsed.add(j);
-            matched2b.add(r2.id);
-            allRows.push({
-              company: r2.party_name,
-              invoice_no: r2.invoice_no || rt.vch_no,
-              date: r2.date || rt.date,
-              tax_2b: r2.tax,
-              tax_books: rt.debit,
-              difference: 0,
-              reason: 'ok',
-              is_matched: true
-            });
-            break;
+        const key = `${r2.party_norm}_${r2.tax}`;
+        if (gCounts[key] === 1 && bCounts[key] === 1) {
+          for (let j = 0; j < dfTally.length; j++) {
+            if (tallyUsed.has(j) || dfTally[j].tax <= 0) continue;
+            const rt = dfTally[j];
+            if (rt.party_norm === r2.party_norm && Math.abs(r2.tax - rt.debit) <= tolerance) {
+              tallyUsed.add(j);
+              matched2b.add(r2.id);
+              allRows.push({
+                company: r2.party_name,
+                invoice_no: r2.invoice_no || rt.vch_no,
+                date: r2.date || rt.date,
+                tax_2b: r2.tax,
+                tax_books: rt.debit,
+                difference: 0,
+                reason: 'ok',
+                is_matched: true
+              });
+              break;
+            }
           }
         }
       });
@@ -588,14 +631,13 @@
       document.getElementById('resultsSection').classList.add('hidden');
 
       try {
-        const mode = document.querySelector('input[name="taxMode"]:checked').value;
+        let userMode = document.querySelector('input[name="taxMode"]:checked').value;
         const bufferA = await inputA.arrayBuffer();
         const bufferB = await inputB.arrayBuffer();
 
         const wbA = XLSX.read(bufferA, { type: 'array' });
         const wbB = XLSX.read(bufferB, { type: 'array' });
 
-        // Auto-detect which workbook is GSTR-2B and which is Tally
         const typeA = identifyWorkbookType(wbA);
         const typeB = identifyWorkbookType(wbB);
 
@@ -615,18 +657,27 @@
           wbGSTR2B = wbB;
           wbTally = wbA;
         } else {
-          // Default: try A as 2B and B as Tally, fallback if fails
           wbGSTR2B = wbA;
           wbTally = wbB;
         }
 
+        // Auto-detect mode if selected
+        let effectiveMode = userMode;
+        if (userMode === 'auto') {
+          effectiveMode = autoDetectTaxModeFromWorkbook(wbTally);
+        }
+
+        const badge = document.getElementById('detectedBadge');
+        badge.innerText = `Active Mode: ${effectiveMode.toUpperCase()}` + (userMode === 'auto' ? ' (Auto-Detected)' : '');
+        badge.classList.remove('hidden');
+
         let df2b, dfTally;
         try {
-          df2b = parseGSTR2BFromWorkbook(wbGSTR2B, mode);
+          df2b = parseGSTR2BFromWorkbook(wbGSTR2B, effectiveMode);
           dfTally = parseTallyFromWorkbook(wbTally);
         } catch (innerErr) {
           // Attempt swap if initial guess failed
-          df2b = parseGSTR2BFromWorkbook(wbTally, mode);
+          df2b = parseGSTR2BFromWorkbook(wbTally, effectiveMode);
           dfTally = parseTallyFromWorkbook(wbGSTR2B);
         }
 
@@ -646,7 +697,7 @@
       document.getElementById('resultsSection').classList.add('hidden');
 
       try {
-        const mode = document.querySelector('input[name="taxMode"]:checked').value;
+        let userMode = document.querySelector('input[name="taxMode"]:checked').value;
         const [res2b, resTally] = await Promise.all([
           fetch('sample_data/gstr2b_oct_2026.csv').then(r => r.text()),
           fetch('sample_data/tally_oct_2026.csv').then(r => r.text())
@@ -655,7 +706,16 @@
         const wb2b = XLSX.read(res2b, { type: 'string' });
         const wbTally = XLSX.read(resTally, { type: 'string' });
 
-        const df2b = parseGSTR2BFromWorkbook(wb2b, mode);
+        let effectiveMode = userMode;
+        if (userMode === 'auto') {
+          effectiveMode = autoDetectTaxModeFromWorkbook(wbTally);
+        }
+
+        const badge = document.getElementById('detectedBadge');
+        badge.innerText = `Active Mode: ${effectiveMode.toUpperCase()}` + (userMode === 'auto' ? ' (Auto-Detected)' : '');
+        badge.classList.remove('hidden');
+
+        const df2b = parseGSTR2BFromWorkbook(wb2b, effectiveMode);
         const dfTally = parseTallyFromWorkbook(wbTally);
 
         const results = reconcileEntries(df2b, dfTally);
@@ -733,18 +793,18 @@
       if (!globalResults) return;
       const wb = XLSX.utils.book_new();
 
-      const exportData = globalResults.all_rows.map(r => ({
+      const exportData = globalResults.discrepancies.map(r => ({
         'Company Name': r.company,
         'Invoice / Voucher No': r.invoice_no,
         'Date': r.date,
         'Tax in GSTR-2B (₹)': r.tax_2b,
         'Tax in Books (₹)': r.tax_books,
         'Difference (₹)': r.difference,
-        'Reason / Remarks': r.reason
+        'Reason / Action Required': r.reason
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
-      XLSX.utils.book_append_sheet(wb, ws, 'Reconciliation');
+      XLSX.utils.book_append_sheet(wb, ws, 'Discrepancies');
       XLSX.writeFile(wb, 'GST_Reconciliation_Discrepancies.xlsx');
     }
   </script>
