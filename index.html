@@ -30,7 +30,7 @@
         </div>
         <div>
           <h1 class="text-base font-bold tracking-tight">GST Reconciliation Agent</h1>
-          <p class="text-[11px] text-slate-400">GSTR-2B ⟷ Tally Books Discrepancy Finder</p>
+          <p class="text-[11px] text-slate-400">GSTR-2B ⟷ Tally Books Discrepancy Finder (Auto-Detect Enabled)</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -48,21 +48,30 @@
 
     <!-- UPLOAD & CONFIG CARD -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+          <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Upload Both Files (Any Order - System Auto-Detects)
+        </h2>
+        <span class="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+          <i class="fa-solid fa-magic mr-1"></i> Smart Auto-Detection Active
+        </span>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Box 1: GSTR-2B -->
+        <!-- Box 1: File A -->
         <div class="border border-slate-200 hover:border-indigo-400 rounded-lg p-3 bg-slate-50/50">
           <label class="block text-xs font-bold text-slate-700 mb-1">
-            <i class="fa-solid fa-file-invoice text-blue-600 mr-1"></i> 1. GSTR-2B File (Excel / CSV)
+            <i class="fa-solid fa-file-invoice text-blue-600 mr-1"></i> File A: GSTR-2B or Tally Ledger
           </label>
-          <input type="file" id="gstr2bFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <input type="file" id="fileInputA" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
         </div>
 
-        <!-- Box 2: Tally Books -->
+        <!-- Box 2: File B -->
         <div class="border border-slate-200 hover:border-indigo-400 rounded-lg p-3 bg-slate-50/50">
           <label class="block text-xs font-bold text-slate-700 mb-1">
-            <i class="fa-solid fa-book text-amber-600 mr-1"></i> 2. Tally Ledger / Books (Excel / CSV)
+            <i class="fa-solid fa-book text-amber-600 mr-1"></i> File B: GSTR-2B or Tally Ledger
           </label>
-          <input type="file" id="tallyFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer">
+          <input type="file" id="fileInputB" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer">
         </div>
       </div>
 
@@ -84,7 +93,7 @@
           </label>
         </div>
 
-        <button onclick="processFiles()" id="reconcileBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-lg text-xs shadow transition flex items-center gap-2">
+        <button onclick="processUploadedFiles()" id="reconcileBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-lg text-xs shadow transition flex items-center gap-2">
           <i class="fa-solid fa-bolt"></i> Run Reconciliation
         </button>
       </div>
@@ -93,7 +102,7 @@
     <!-- LOADING SPINNER -->
     <div id="loadingBox" class="hidden text-center py-8">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-indigo-600 border-t-transparent"></div>
-      <p class="mt-2 text-xs font-semibold text-slate-600">Reconciling records...</p>
+      <p class="mt-2 text-xs font-semibold text-slate-600">Detecting file formats and reconciling records...</p>
     </div>
 
     <!-- RESULTS SECTION -->
@@ -209,44 +218,134 @@
       return inv.toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
 
-    function parseGSTR2BFromWorkbook(wb, mode) {
-      let b2bSheetName = wb.SheetNames.find(s => s.toLowerCase().includes('b2b') && !s.toLowerCase().includes('cdnr') && !s.toLowerCase().includes('a'));
-      if (!b2bSheetName) b2bSheetName = wb.SheetNames[0];
-      const ws = wb.Sheets[b2bSheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    // Inspects a workbook to determine if it is GSTR-2B or Tally
+    function identifyWorkbookType(wb) {
+      let isGSTR2B = false;
+      let isTally = false;
 
-      let headerIdx = -1;
-      for (let i = 0; i < rows.length; i++) {
-        const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
-        if (rowStr.includes('gstin of supplier')) {
-          headerIdx = i;
+      // Check sheet names first
+      for (const sheet of wb.SheetNames) {
+        const sLower = sheet.toLowerCase();
+        if (sLower.includes('b2b') || sLower.includes('gstr2b') || sLower.includes('2b')) {
+          isGSTR2B = true;
           break;
         }
       }
-      if (headerIdx === -1) throw new Error("Could not locate GSTR-2B B2B table header in file.");
 
+      // Check row contents across sheets
+      for (const sheet of wb.SheetNames) {
+        const ws = wb.Sheets[sheet];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        for (let i = 0; i < Math.min(rows.length, 30); i++) {
+          const str = rows[i].map(c => String(c).toLowerCase()).join(' ');
+          if (str.includes('gstin of supplier') || str.includes('gstin') && str.includes('trade')) {
+            isGSTR2B = true;
+          }
+          if (str.includes('particular') && (str.includes('debit') || str.includes('vch') || str.includes('credit'))) {
+            isTally = true;
+          }
+        }
+      }
+
+      if (isGSTR2B && !isTally) return 'GSTR2B';
+      if (isTally && !isGSTR2B) return 'TALLY';
+      return isGSTR2B ? 'GSTR2B' : (isTally ? 'TALLY' : 'UNKNOWN');
+    }
+
+    function parseGSTR2BFromWorkbook(wb, mode) {
+      // Find sheet that contains B2B or GSTIN table
+      let targetSheetName = null;
+      let targetRows = null;
+      let headerIdx = -1;
+
+      for (const sheet of wb.SheetNames) {
+        const ws = wb.Sheets[sheet];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        for (let i = 0; i < Math.min(rows.length, 40); i++) {
+          const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
+          if (rowStr.includes('gstin of supplier') || (rowStr.includes('gstin') && rowStr.includes('trade'))) {
+            targetSheetName = sheet;
+            targetRows = rows;
+            headerIdx = i;
+            break;
+          }
+        }
+        if (targetSheetName) break;
+      }
+
+      // Fallback: search for columns like Invoice number, Integrated Tax, Central Tax
+      if (!targetSheetName) {
+        for (const sheet of wb.SheetNames) {
+          const ws = wb.Sheets[sheet];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          for (let i = 0; i < Math.min(rows.length, 40); i++) {
+            const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
+            if (rowStr.includes('integrated tax') || rowStr.includes('central tax') || (rowStr.includes('taxable') && rowStr.includes('invoice'))) {
+              targetSheetName = sheet;
+              targetRows = rows;
+              headerIdx = i;
+              break;
+            }
+          }
+          if (targetSheetName) break;
+        }
+      }
+
+      if (!targetSheetName || headerIdx === -1) {
+        throw new Error("Could not find GSTR-2B B2B table in file. Please ensure GSTR-2B file is uploaded.");
+      }
+
+      const rows = targetRows;
       const records = [];
+
+      // Detect column indices from header row(s)
+      let gstinCol = 0, nameCol = 1, invCol = 2, dateCol = 4, igstCol = 9, cgstCol = 10, sgstCol = 11;
+
+      // Scan header row for exact column headers if present
+      const hRow = rows[headerIdx].map(c => String(c).toLowerCase().trim());
+      hRow.forEach((c, idx) => {
+        if (c.includes('gstin')) gstinCol = idx;
+        if (c.includes('trade') || c.includes('legal name')) nameCol = idx;
+        if (c.includes('invoice number') || c.includes('invoice no')) invCol = idx;
+        if (c.includes('invoice date') || c.includes('date')) dateCol = idx;
+        if (c.includes('integrated tax') || c.includes('igst')) igstCol = idx;
+        if (c.includes('central tax') || c.includes('cgst')) cgstCol = idx;
+        if (c.includes('state') || c.includes('sgst')) sgstCol = idx;
+      });
+
+      // Also check subheader row (headerIdx + 1)
+      if (headerIdx + 1 < rows.length) {
+        const subRow = rows[headerIdx + 1].map(c => String(c).toLowerCase().trim());
+        subRow.forEach((c, idx) => {
+          if (c.includes('invoice number') || c.includes('invoice no')) invCol = idx;
+          if (c.includes('invoice date')) dateCol = idx;
+          if (c.includes('integrated tax') || c.includes('igst')) igstCol = idx;
+          if (c.includes('central tax') || c.includes('cgst')) cgstCol = idx;
+          if (c.includes('state') || c.includes('sgst')) sgstCol = idx;
+        });
+      }
+
+      const parseNum = (v) => {
+        if (!v) return 0.0;
+        const n = parseFloat(String(v).replace(/,/g, '').trim());
+        return isNaN(n) ? 0.0 : n;
+      };
+
       for (let i = headerIdx + 2; i < rows.length; i++) {
         const r = rows[i];
         if (!r || r.length < 5) continue;
-        const firstCell = String(r[0] || '').trim();
+        const firstCell = String(r[gstinCol] || r[0] || '').trim();
         if (['amendments', 'goods and services tax', 'table', 'summary'].some(t => firstCell.toLowerCase().includes(t))) break;
         if (!firstCell) continue;
-        if (firstCell.length !== 15 && !(firstCell.length >= 2 && !isNaN(firstCell.slice(0, 2)))) continue;
 
-        const parseNum = (v) => {
-          if (!v) return 0.0;
-          const n = parseFloat(String(v).replace(/,/g, '').trim());
-          return isNaN(n) ? 0.0 : n;
-        };
+        const gstin = String(r[gstinCol] || '').trim();
+        const tradeName = String(r[nameCol] || '').trim();
+        const invNo = String(r[invCol] || '').trim();
+        const invDate = String(r[dateCol] || '').trim();
 
-        const gstin = String(r[0] || '').trim();
-        const tradeName = String(r[1] || '').trim();
-        const invNo = String(r[2] || '').trim();
-        const invDate = String(r[4] || '').trim();
-        const igst = parseNum(r[9]);
-        const cgst = parseNum(r[10]);
-        const sgst = parseNum(r[11]);
+        const igst = parseNum(r[igstCol]);
+        const cgst = parseNum(r[cgstCol]);
+        const sgst = parseNum(r[sgstCol]);
 
         let targetTax = igst;
         if (mode === 'cgst_sgst') targetTax = cgst + sgst;
@@ -269,19 +368,40 @@
     }
 
     function parseTallyFromWorkbook(wb) {
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
+      let targetSheetName = null;
+      let targetRows = null;
       let headerIdx = -1;
-      for (let i = 0; i < rows.length; i++) {
-        const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
-        if (rowStr.includes('particular') && (rowStr.includes('debit') || rowStr.includes('vch'))) {
-          headerIdx = i;
-          break;
+
+      for (const sheet of wb.SheetNames) {
+        const ws = wb.Sheets[sheet];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        for (let i = 0; i < Math.min(rows.length, 30); i++) {
+          const rowStr = rows[i].map(c => String(c).toLowerCase()).join(' ');
+          if (rowStr.includes('particular') && (rowStr.includes('debit') || rowStr.includes('vch') || rowStr.includes('credit'))) {
+            targetSheetName = sheet;
+            targetRows = rows;
+            headerIdx = i;
+            break;
+          }
+        }
+        if (targetSheetName) break;
+      }
+
+      if (!targetSheetName || headerIdx === -1) {
+        // Fallback to first sheet
+        targetRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+        for (let i = 0; i < Math.min(targetRows.length, 30); i++) {
+          const rowStr = targetRows[i].map(c => String(c).toLowerCase()).join(' ');
+          if (rowStr.includes('particular') || rowStr.includes('debit') || rowStr.includes('amount')) {
+            headerIdx = i;
+            break;
+          }
         }
       }
-      if (headerIdx === -1) throw new Error("Could not locate Tally ledger header in file.");
 
+      if (headerIdx === -1) throw new Error("Could not find Tally ledger header in file. Please ensure Tally file is uploaded.");
+
+      const rows = targetRows;
       const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
       const colMap = {};
       header.forEach((h, idx) => {
@@ -438,7 +558,6 @@
         }
       });
 
-      // Sort discrepancies first
       allRows.sort((a, b) => {
         if (a.is_matched !== b.is_matched) return a.is_matched ? 1 : -1;
         return Math.abs(b.difference) - Math.abs(a.difference);
@@ -456,12 +575,12 @@
       };
     }
 
-    async function processFiles() {
-      const gstr2bInput = document.getElementById('gstr2bFileInput').files[0];
-      const tallyInput = document.getElementById('tallyFileInput').files[0];
+    async function processUploadedFiles() {
+      const inputA = document.getElementById('fileInputA').files[0];
+      const inputB = document.getElementById('fileInputB').files[0];
 
-      if (!gstr2bInput || !tallyInput) {
-        alert("Please upload both GSTR-2B and Tally files, or click 'Load October 2026 Sample Data'.");
+      if (!inputA || !inputB) {
+        alert("Please select both files (GSTR-2B and Tally Ledger), or click 'Load October 2026 Sample Data'.");
         return;
       }
 
@@ -470,14 +589,46 @@
 
       try {
         const mode = document.querySelector('input[name="taxMode"]:checked').value;
-        const gstr2bBuffer = await gstr2bInput.arrayBuffer();
-        const tallyBuffer = await tallyInput.arrayBuffer();
+        const bufferA = await inputA.arrayBuffer();
+        const bufferB = await inputB.arrayBuffer();
 
-        const wb2b = XLSX.read(gstr2bBuffer, { type: 'array' });
-        const wbTally = XLSX.read(tallyBuffer, { type: 'array' });
+        const wbA = XLSX.read(bufferA, { type: 'array' });
+        const wbB = XLSX.read(bufferB, { type: 'array' });
 
-        const df2b = parseGSTR2BFromWorkbook(wb2b, mode);
-        const dfTally = parseTallyFromWorkbook(wbTally);
+        // Auto-detect which workbook is GSTR-2B and which is Tally
+        const typeA = identifyWorkbookType(wbA);
+        const typeB = identifyWorkbookType(wbB);
+
+        let wbGSTR2B = null;
+        let wbTally = null;
+
+        if (typeA === 'GSTR2B' && typeB === 'TALLY') {
+          wbGSTR2B = wbA;
+          wbTally = wbB;
+        } else if (typeA === 'TALLY' && typeB === 'GSTR2B') {
+          wbGSTR2B = wbB;
+          wbTally = wbA;
+        } else if (typeA === 'GSTR2B') {
+          wbGSTR2B = wbA;
+          wbTally = wbB;
+        } else if (typeB === 'GSTR2B') {
+          wbGSTR2B = wbB;
+          wbTally = wbA;
+        } else {
+          // Default: try A as 2B and B as Tally, fallback if fails
+          wbGSTR2B = wbA;
+          wbTally = wbB;
+        }
+
+        let df2b, dfTally;
+        try {
+          df2b = parseGSTR2BFromWorkbook(wbGSTR2B, mode);
+          dfTally = parseTallyFromWorkbook(wbTally);
+        } catch (innerErr) {
+          // Attempt swap if initial guess failed
+          df2b = parseGSTR2BFromWorkbook(wbTally, mode);
+          dfTally = parseTallyFromWorkbook(wbGSTR2B);
+        }
 
         const results = reconcileEntries(df2b, dfTally);
         globalResults = results;
