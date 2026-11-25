@@ -30,7 +30,7 @@
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight">GST Reconciliation AI Agent</h1>
-          <p class="text-xs text-blue-200">GSTR-2B (GST Portal) ⟷ Tally / ERP Books Instant Matcher</p>
+          <p class="text-xs text-blue-200">GSTR-2B (GST Portal) ⟷ Tally / ERP Books Automated Matcher</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -51,12 +51,12 @@
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4">
         <div>
           <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Step 1: Upload Sheets & Select Tax Mode
+            <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Step 1: Upload Documents & Select Tax Mode
           </h2>
-          <p class="text-xs text-slate-500">100% Private & Secure: Sari files aapke browser mai hi process hoti hain, koi data bahar nahi jata.</p>
+          <p class="text-xs text-slate-500">100% Client-Side Privacy: All files are processed directly within your browser. No financial data is uploaded to any server.</p>
         </div>
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <i class="fa-solid fa-shield-halved"></i> 100% Client-Side Privacy
+          <i class="fa-solid fa-shield-halved"></i> 100% Client-Side Security
         </span>
       </div>
 
@@ -101,7 +101,7 @@
         </div>
 
         <button onclick="processFiles()" id="reconcileBtn" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-play"></i> Reconcile Now (Match Karein)
+          <i class="fa-solid fa-play"></i> Run Reconciliation
         </button>
       </div>
     </div>
@@ -109,7 +109,7 @@
     <!-- LOADING SPINNER -->
     <div id="loadingBox" class="hidden text-center py-12">
       <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent"></div>
-      <p class="mt-3 text-sm font-semibold text-slate-600">Matching GSTR-2B & Tally vouchers in browser...</p>
+      <p class="mt-3 text-sm font-semibold text-slate-600">Reconciling GSTR-2B and Tally records in browser...</p>
     </div>
 
     <!-- RESULTS SECTION -->
@@ -144,7 +144,7 @@
         <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
           <div class="text-xs font-semibold text-slate-500 uppercase">Tax Mismatches</div>
           <div id="kpiMismatch" class="text-lg font-bold text-amber-600 mt-1">0</div>
-          <div class="text-[11px] text-amber-600 mt-0.5">🟡 Value Differs</div>
+          <div class="text-[11px] text-amber-600 mt-0.5">🟡 Value Variance</div>
         </div>
 
         <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -162,7 +162,7 @@
             <button onclick="setFilter('TAX_MISMATCH')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-amber-100 transition">Tax Mismatch (<span id="countMismatch">0</span>)</button>
             <button onclick="setFilter('MISSING_IN_GSTR2B')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-rose-100 transition">Missing in 2B (<span id="countMissing2b">0</span>)</button>
             <button onclick="setFilter('MISSING_IN_TALLY')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-100 transition">Missing in Tally (<span id="countMissingTally">0</span>)</button>
-            <button onclick="setFilter('CREDIT_REVERSAL')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-purple-100 transition">Reversals/Credit (<span id="countReversal">0</span>)</button>
+            <button onclick="setFilter('CREDIT_REVERSAL')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-purple-100 transition">Reversals / Credit (<span id="countReversal">0</span>)</button>
             <button onclick="setFilter('MATCHED')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-emerald-100 transition">Matched (<span id="countMatchedTab">0</span>)</button>
           </div>
 
@@ -279,7 +279,6 @@
     }
 
     function parseGSTR2BFromWorkbook(wb, mode) {
-      // Find B2B worksheet
       let b2bSheetName = wb.SheetNames.find(s => s.toLowerCase().includes('b2b') && !s.toLowerCase().includes('cdnr') && !s.toLowerCase().includes('a'));
       if (!b2bSheetName) b2bSheetName = wb.SheetNames[0];
       const ws = wb.Sheets[b2bSheetName];
@@ -293,7 +292,7 @@
           break;
         }
       }
-      if (headerIdx === -1) throw new Error("Could not find GSTR-2B B2B table header in file.");
+      if (headerIdx === -1) throw new Error("Could not locate GSTR-2B B2B table header in the uploaded file.");
 
       const records = [];
       for (let i = headerIdx + 2; i < rows.length; i++) {
@@ -354,7 +353,7 @@
           break;
         }
       }
-      if (headerIdx === -1) throw new Error("Could not find Tally ledger header in file.");
+      if (headerIdx === -1) throw new Error("Could not locate Tally ledger table header in the uploaded file.");
 
       const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
       const colMap = {};
@@ -486,8 +485,8 @@
             tax_tally: 0.0,
             difference: r2b.total_tax_2b,
             status: 'MISSING_IN_TALLY',
-            status_label: 'Missing in Tally (Bill Unbooked)',
-            reason: `Tax ₹${r2b.total_tax_2b.toLocaleString('en-IN', {minimumFractionDigits:2})} GSTR-2B mai de rakha hai, par Tally accounts mai record nahi hai. (Action: Accounts team bill tally mai enter kare).`,
+            status_label: 'Missing in Tally (Bill Unrecorded)',
+            reason: `Tax of ₹${r2b.total_tax_2b.toLocaleString('en-IN', {minimumFractionDigits:2})} is available in GSTR-2B but unrecorded in Tally books. (Action: Accounts team should record invoice to claim ITC).`,
             invoices_2b: r2b.invoices_2b.join(', '),
             vouchers_tally: ''
           });
@@ -506,7 +505,7 @@
             difference: -rt.total_tax_tally,
             status: 'MISSING_IN_GSTR2B',
             status_label: 'Missing in GSTR-2B (Vendor GSTR-1 Pending)',
-            reason: `Tax ₹${rt.total_tax_tally.toLocaleString('en-IN', {minimumFractionDigits:2})} Tally mai book ho chuka hai, par GSTR-2B mai nahi hai. (Action: Supplier ne GSTR-1 file nahi kiya ya late hai; Supplier ko follow-up karein).`,
+            reason: `Tax of ₹${rt.total_tax_tally.toLocaleString('en-IN', {minimumFractionDigits:2})} is booked in Tally but not reflected in GSTR-2B. (Action: Supplier has not filed GSTR-1 or filed with incorrect GSTIN; follow up with vendor).`,
             invoices_2b: '',
             vouchers_tally: rt.vouchers_tally.join(', ')
           });
@@ -524,7 +523,7 @@
           difference: rc.credit,
           status: 'CREDIT_REVERSAL',
           status_label: 'Credit / Tax Reversal in Tally',
-          reason: `Credit entry ₹${rc.credit.toLocaleString('en-IN', {minimumFractionDigits:2})} in Tally (${rc.vch_type} - Vch ${rc.vch_no}). Ye purchase ka tax nahi hai, reversal ya sale entry hai.`,
+          reason: `Credit entry of ₹${rc.credit.toLocaleString('en-IN', {minimumFractionDigits:2})} in Tally (${rc.vch_type} - Vch ${rc.vch_no}). Represents a tax reversal or sales adjustment, not an inward purchase supply.`,
           invoices_2b: '',
           vouchers_tally: rc.vch_no
         });
@@ -568,15 +567,15 @@
       const diff = Math.round((tax2b - taxTally) * 100) / 100;
       let status = 'MATCHED';
       let statusLabel = 'Matched (Exact / Within ₹1)';
-      let reason = `Dono sheets mai Tax amount match ho gaya (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}).`;
+      let reason = `Tax amounts match exactly across both records (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}).`;
 
       if (Math.abs(diff) > tolerance) {
         status = 'TAX_MISMATCH';
         statusLabel = 'Tax Amount Mismatch';
         if (diff > 0) {
-          reason = `GSTR-2B mai Tax ₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})} hai, par Tally mai kam hai (₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})}). Difference: ₹${diff.toLocaleString('en-IN', {minimumFractionDigits:2})}.`;
+          reason = `GSTR-2B tax (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}) exceeds Tally books (₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})}). Unbooked ITC variance: ₹${diff.toLocaleString('en-IN', {minimumFractionDigits:2})}.`;
         } else {
-          reason = `Tally mai Tax ₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})} book hai, par GSTR-2B mai kam reflect ho raha hai (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}). Difference: ₹${Math.abs(diff).toLocaleString('en-IN', {minimumFractionDigits:2})}.`;
+          reason = `Tally tax claimed (₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})}) exceeds GSTR-2B reflection (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}). Variance: ₹${Math.abs(diff).toLocaleString('en-IN', {minimumFractionDigits:2})}. (Action: Reconcile with supplier or adjust ITC in GSTR-3B).`;
         }
       }
 
@@ -702,7 +701,7 @@
       const tallyInput = document.getElementById('tallyFileInput').files[0];
 
       if (!gstr2bInput || !tallyInput) {
-        alert("Kripya dono files (GSTR-2B aur Tally) upload karein ya 'Load October 2026 Sample Data' pe click karein.");
+        alert("Please upload both files (GSTR-2B and Tally), or click 'Load October 2026 Sample Data'.");
         return;
       }
 
@@ -737,7 +736,6 @@
 
       try {
         const mode = document.querySelector('input[name="taxMode"]:checked').value;
-        // Fetch sample CSVs from repository
         const [res2b, resTally] = await Promise.all([
           fetch('sample_data/gstr2b_oct_2026.csv').then(r => r.text()),
           fetch('sample_data/tally_oct_2026.csv').then(r => r.text())
@@ -857,7 +855,7 @@
       modalBody.innerHTML = '';
 
       if (invoices.length === 0) {
-        modalBody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">No invoice level lines found.</td></tr>`;
+        modalBody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">No invoice records found.</td></tr>`;
       } else {
         invoices.forEach(inv => {
           const tr = document.createElement('tr');

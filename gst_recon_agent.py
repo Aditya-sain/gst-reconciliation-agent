@@ -300,7 +300,7 @@ class GSTReconciliationAgent:
         df_2b = self.parse_gstr2b(gstr2b_file)
         df_tally = self.parse_tally(tally_file)
         
-        # Filter GSTR-2B based on target tax > 0 (or all if total)
+        # Filter GSTR-2B based on target tax > 0
         df_2b_filtered = df_2b[df_2b['target_tax'] > 0].copy()
         
         # Aggregate GSTR-2B by Party
@@ -371,8 +371,8 @@ class GSTReconciliationAgent:
                     'tax_tally': 0.0,
                     'difference': r2b['total_tax_2b'],
                     'status': 'MISSING_IN_TALLY',
-                    'status_label': 'Missing in Tally (Bill Unbooked)',
-                    'reason': f"Tax ₹{r2b['total_tax_2b']:,.2f} GSTR-2B mai de rakha hai, par Tally accounts mai record nahi hai. (Action: Accounts team bill tally mai enter kare).",
+                    'status_label': 'Missing in Tally (Bill Unrecorded)',
+                    'reason': f"Tax of ₹{r2b['total_tax_2b']:,.2f} is available in GSTR-2B but unrecorded in Tally books. (Action: Accounts team should record invoice to claim ITC).",
                     'invoices_2b': r2b['invoices_2b'],
                     'vouchers_tally': ''
                 })
@@ -389,7 +389,7 @@ class GSTReconciliationAgent:
                     'difference': -rt['total_tax_tally'],
                     'status': 'MISSING_IN_GSTR2B',
                     'status_label': 'Missing in GSTR-2B (Vendor GSTR-1 Pending)',
-                    'reason': f"Tax ₹{rt['total_tax_tally']:,.2f} Tally mai book ho chuka hai, par GSTR-2B mai nahi hai. (Action: Supplier ne GSTR-1 file nahi kiya ya late hai; Supplier ko follow-up karein).",
+                    'reason': f"Tax of ₹{rt['total_tax_tally']:,.2f} is booked in Tally but not reflected in GSTR-2B. (Action: Supplier has not filed GSTR-1 or filed with incorrect GSTIN; follow up with vendor).",
                     'invoices_2b': '',
                     'vouchers_tally': rt['vouchers_tally']
                 })
@@ -405,14 +405,14 @@ class GSTReconciliationAgent:
                 'difference': rc['credit'],
                 'status': 'CREDIT_REVERSAL',
                 'status_label': 'Credit / Tax Reversal in Tally',
-                'reason': f"Credit entry ₹{rc['credit']:,.2f} in Tally ({rc['vch_type']} - Vch {rc['vch_no']}). Ye purchase ka tax nahi hai, reversal ya sale entry hai.",
+                'reason': f"Credit entry of ₹{rc['credit']:,.2f} in Tally ({rc['vch_type']} - Vch {rc['vch_no']}). Represents a tax reversal or sales adjustment, not an inward purchase supply.",
                 'invoices_2b': '',
                 'vouchers_tally': rc['vch_no']
             })
 
         df_party_summary = pd.DataFrame(party_recon_rows)
         
-        # Sort so Mismatches & Missing items appear at top
+        # Sort priority
         priority_map = {'MISSING_IN_GSTR2B': 1, 'MISSING_IN_TALLY': 2, 'TAX_MISMATCH': 3, 'CREDIT_REVERSAL': 4, 'MATCHED': 5}
         df_party_summary['priority'] = df_party_summary['status'].map(priority_map).fillna(9)
         df_party_summary = df_party_summary.sort_values(by=['priority', 'difference'], ascending=[True, False]).drop(columns=['priority'])
@@ -442,7 +442,6 @@ class GSTReconciliationAgent:
             'count_missing_in_tally': missing_tally_count
         }
         
-        # Generate Invoice-level drilldown
         invoice_details = self._reconcile_invoices(df_2b_filtered, df_tally)
         
         return {
@@ -461,14 +460,14 @@ class GSTReconciliationAgent:
         if abs(diff) <= self.tolerance:
             status = 'MATCHED'
             status_label = 'Matched (Exact / Within ₹1)'
-            reason = f"Dono sheets mai Tax amount match ho gaya (₹{tax_2b:,.2f})."
+            reason = f"Tax amounts match exactly across both records (₹{tax_2b:,.2f})."
         else:
             status = 'TAX_MISMATCH'
             status_label = 'Tax Amount Mismatch'
             if diff > 0:
-                reason = f"GSTR-2B mai Tax ₹{tax_2b:,.2f} hai, par Tally mai kam hai (₹{tax_tally:,.2f}). Difference: ₹{diff:,.2f}."
+                reason = f"GSTR-2B tax (₹{tax_2b:,.2f}) exceeds Tally books (₹{tax_tally:,.2f}). Unbooked ITC variance: ₹{diff:,.2f}."
             else:
-                reason = f"Tally mai Tax ₹{tax_tally:,.2f} book hai, par GSTR-2B mai kam reflect ho raha hai (₹{tax_2b:,.2f}). Difference: ₹{abs(diff):,.2f}."
+                reason = f"Tally tax claimed (₹{tax_tally:,.2f}) exceeds GSTR-2B reflection (₹{tax_2b:,.2f}). Variance: ₹{abs(diff):,.2f}. (Action: Reconcile with supplier or adjust ITC in GSTR-3B)."
                 
         return {
             'party_name_2b': r2b['party_name'],
@@ -496,7 +495,6 @@ class GSTReconciliationAgent:
             amt_2b = r2['target_tax']
             party_norm = r2['party_norm']
             
-            # Find in Tally by clean invoice no
             match_found = False
             for j, rt in df_tally.iterrows():
                 if j in tally_used:
@@ -557,7 +555,7 @@ class GSTReconciliationAgent:
                     'status': 'MISSING_IN_TALLY'
                 })
                 
-        # Any remaining Tally entries
+        # Remaining Tally entries
         for j, rt in df_tally.iterrows():
             if j not in tally_used:
                 rows.append({
@@ -583,10 +581,8 @@ class GSTReconciliationAgent:
         df_inv = recon_result['invoice_details']
         
         wb = openpyxl.Workbook()
-        # Remove default sheet
         wb.remove(wb.active)
         
-        # Colors
         navy_header = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
         white_bold = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
         title_font = Font(name="Calibri", size=16, bold=True, color="1E3A8A")
@@ -600,7 +596,6 @@ class GSTReconciliationAgent:
             bottom=Side(style='thin', color='E2E8F0')
         )
         
-        # Status Styles
         status_styles = {
             'MATCHED': (PatternFill(start_color="DCFCE7", fill_type="solid"), Font(color="166534", bold=True)),
             'TAX_MISMATCH': (PatternFill(start_color="FEF3C7", fill_type="solid"), Font(color="92400E", bold=True)),
@@ -634,7 +629,7 @@ class GSTReconciliationAgent:
             ("Parties Matched (Exact / Within ₹1)", summary['count_matched'], "#,##0"),
             ("Parties with Tax Amount Mismatch", summary['count_mismatch'], "#,##0"),
             ("Parties Missing in GSTR-2B (Vendor GSTR-1 Pending)", summary['count_missing_in_gstr2b'], "#,##0"),
-            ("Parties Missing in Tally (Unbooked Bills)", summary['count_missing_in_tally'], "#,##0"),
+            ("Parties Missing in Tally (Unrecorded Invoices)", summary['count_missing_in_tally'], "#,##0"),
         ]
         
         start_row = 4
@@ -766,7 +761,7 @@ class GSTReconciliationAgent:
                 ws.column_dimensions[col_letter].width = max(max_len + 3, 14)
 
         wb.save(output_path)
-        print(f"Formatted corporate Excel report saved to: {output_path}")
+        print(f"Corporate Excel report saved to: {output_path}")
         return output_path
 
 def main():
