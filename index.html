@@ -3,220 +3,152 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GST Reconciliation AI Agent | Finance Department</title>
+  <title>GST Reconciliation Agent</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- SheetJS (xlsx.full.min.js) for 100% Client-Side Excel/CSV Processing -->
+  <!-- SheetJS for In-Browser Processing -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-    .badge-matched { background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
-    .badge-mismatch { background-color: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
-    .badge-missing-2b { background-color: #FFE4E6; color: #9F1239; border: 1px solid #FDA4AF; }
-    .badge-missing-tally { background-color: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
+    .badge-not-in-books { background-color: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
+    .badge-not-in-2b { background-color: #FFE4E6; color: #9F1239; border: 1px solid #FDA4AF; }
     .badge-reversal { background-color: #F3E8FF; color: #6B21A8; border: 1px solid #D8B4FE; }
+    .badge-mismatch { background-color: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+    .badge-matched { background-color: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
   </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 
   <!-- TOP HEADER -->
-  <header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-lg sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-3">
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400 flex items-center justify-center text-blue-300 text-xl font-bold shadow-inner">
+        <div class="w-9 h-9 rounded-lg bg-blue-500/20 border border-blue-400 flex items-center justify-center text-blue-300 font-bold">
           <i class="fa-solid fa-scale-balanced"></i>
         </div>
         <div>
-          <h1 class="text-xl font-bold tracking-tight">GST Reconciliation AI Agent</h1>
-          <p class="text-xs text-blue-200">GSTR-2B (GST Portal) ⟷ Tally / ERP Books Automated Matcher</p>
+          <h1 class="text-base font-bold tracking-tight">GST Reconciliation Agent</h1>
+          <p class="text-[11px] text-slate-400">GSTR-2B ⟷ Tally Books Discrepancy Finder</p>
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="loadSampleDemo()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm shadow transition flex items-center gap-2">
+        <button onclick="loadSampleDemo()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold px-3.5 py-1.5 rounded-lg text-xs shadow transition flex items-center gap-1.5">
           <i class="fa-solid fa-wand-magic-sparkles"></i> Load October 2026 Sample Data
         </button>
-        <button id="downloadBtn" onclick="exportExcelReport()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-sm shadow transition flex items-center gap-2">
-          <i class="fa-solid fa-file-excel"></i> Download Excel Report (.xlsx)
+        <button id="downloadBtn" onclick="exportExcelReport()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-1.5 rounded-lg text-xs shadow transition flex items-center gap-1.5">
+          <i class="fa-solid fa-file-excel"></i> Download Excel Report
         </button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <main class="max-w-7xl mx-auto px-4 py-5 space-y-5">
 
     <!-- UPLOAD & CONFIG CARD -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 mb-4">
-        <div>
-          <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Step 1: Upload Documents & Select Tax Mode
-          </h2>
-          <p class="text-xs text-slate-500">100% Client-Side Privacy: All files are processed directly within your browser. No financial data is uploaded to any server.</p>
-        </div>
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <i class="fa-solid fa-shield-halved"></i> 100% Client-Side Security
-        </span>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- File 1: GSTR-2B -->
-        <div class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-5 text-center transition bg-slate-50/50">
-          <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl">
-            <i class="fa-solid fa-file-invoice"></i>
-          </div>
-          <h3 class="font-bold text-slate-800 text-sm">1. GSTR-2B File (GST Portal)</h3>
-          <p class="text-xs text-slate-500 mb-3">Upload B2B Excel (.xlsx) or CSV downloaded from GST Portal</p>
-          <input type="file" id="gstr2bFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Box 1: GSTR-2B -->
+        <div class="border border-slate-200 hover:border-indigo-400 rounded-lg p-3 bg-slate-50/50">
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            <i class="fa-solid fa-file-invoice text-blue-600 mr-1"></i> 1. GSTR-2B File (Excel / CSV)
+          </label>
+          <input type="file" id="gstr2bFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
         </div>
 
-        <!-- File 2: Tally Ledger -->
-        <div class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-5 text-center transition bg-slate-50/50">
-          <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xl">
-            <i class="fa-solid fa-book-bookmark"></i>
-          </div>
-          <h3 class="font-bold text-slate-800 text-sm">2. Tally Ledger / Books File</h3>
-          <p class="text-xs text-slate-500 mb-3">Upload Tally Input Tax Ledger (e.g. Input IGST 18% - PB)</p>
-          <input type="file" id="tallyFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer">
+        <!-- Box 2: Tally Books -->
+        <div class="border border-slate-200 hover:border-indigo-400 rounded-lg p-3 bg-slate-50/50">
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            <i class="fa-solid fa-book text-amber-600 mr-1"></i> 2. Tally Ledger / Books (Excel / CSV)
+          </label>
+          <input type="file" id="tallyFileInput" accept=".csv, .xlsx, .xls" class="block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 cursor-pointer">
         </div>
       </div>
 
       <!-- Controls Row -->
-      <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-4">
-          <span class="text-sm font-semibold text-slate-700">Tax Mode:</span>
-          <label class="inline-flex items-center text-sm gap-2 cursor-pointer">
-            <input type="radio" name="taxMode" value="igst" checked class="text-indigo-600 focus:ring-indigo-500">
-            <span class="font-medium">IGST (Inter-State)</span>
+      <div class="mt-4 pt-3 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-4 text-xs font-medium text-slate-700">
+          <span>Tax Mode:</span>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="igst" checked class="text-indigo-600">
+            <span>IGST</span>
           </label>
-          <label class="inline-flex items-center text-sm gap-2 cursor-pointer">
-            <input type="radio" name="taxMode" value="cgst_sgst" class="text-indigo-600 focus:ring-indigo-500">
-            <span class="font-medium">CGST + SGST (Intra-State)</span>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="cgst_sgst" class="text-indigo-600">
+            <span>CGST + SGST</span>
           </label>
-          <label class="inline-flex items-center text-sm gap-2 cursor-pointer">
-            <input type="radio" name="taxMode" value="total" class="text-indigo-600 focus:ring-indigo-500">
-            <span class="font-medium">Total Tax</span>
+          <label class="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" name="taxMode" value="total" class="text-indigo-600">
+            <span>Total Tax</span>
           </label>
         </div>
 
-        <button onclick="processFiles()" id="reconcileBtn" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
-          <i class="fa-solid fa-play"></i> Run Reconciliation
+        <button onclick="processFiles()" id="reconcileBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-2 rounded-lg text-xs shadow transition flex items-center gap-2">
+          <i class="fa-solid fa-bolt"></i> Run Reconciliation
         </button>
       </div>
     </div>
 
     <!-- LOADING SPINNER -->
-    <div id="loadingBox" class="hidden text-center py-12">
-      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent"></div>
-      <p class="mt-3 text-sm font-semibold text-slate-600">Reconciling GSTR-2B and Tally records in browser...</p>
+    <div id="loadingBox" class="hidden text-center py-8">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-indigo-600 border-t-transparent"></div>
+      <p class="mt-2 text-xs font-semibold text-slate-600">Reconciling records...</p>
     </div>
 
     <!-- RESULTS SECTION -->
-    <div id="resultsSection" class="hidden space-y-6">
+    <div id="resultsSection" class="hidden space-y-4">
 
-      <!-- KPI METRIC CARDS -->
-      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">GSTR-2B Tax</div>
-          <div id="kpi2bTax" class="text-lg font-bold text-blue-700 mt-1">₹ 0.00</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Portal Inward Supplies</div>
+      <!-- SUMMARY BAR -->
+      <div class="bg-slate-900 text-white p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-6">
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase">Total Discrepancies</span>
+            <span id="statDiscCount" class="text-base font-bold text-amber-400">0</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase">Net Tax Difference</span>
+            <span id="statNetDiff" class="text-base font-bold text-rose-400">₹ 0.00</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px] uppercase">Matched Entries (OK)</span>
+            <span id="statMatchedCount" class="text-base font-bold text-emerald-400">0</span>
+          </div>
         </div>
 
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">Tally Claimed Tax</div>
-          <div id="kpiTallyTax" class="text-lg font-bold text-indigo-700 mt-1">₹ 0.00</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Purchase Vouchers Debit</div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">Net Difference</div>
-          <div id="kpiDiff" class="text-lg font-bold text-rose-600 mt-1">₹ 0.00</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">GSTR-2B minus Tally</div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">Matched Parties</div>
-          <div id="kpiMatched" class="text-lg font-bold text-emerald-600 mt-1">0</div>
-          <div class="text-[11px] text-emerald-600 mt-0.5">🟢 100% Verified</div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">Tax Mismatches</div>
-          <div id="kpiMismatch" class="text-lg font-bold text-amber-600 mt-1">0</div>
-          <div class="text-[11px] text-amber-600 mt-0.5">🟡 Value Variance</div>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-          <div class="text-xs font-semibold text-slate-500 uppercase">Missing In 2B</div>
-          <div id="kpiMissing2b" class="text-lg font-bold text-rose-600 mt-1">0</div>
-          <div class="text-[11px] text-rose-600 mt-0.5">🔴 Vendor GSTR-1 Pending</div>
+        <!-- Table Filters -->
+        <div class="flex items-center gap-4">
+          <label class="inline-flex items-center gap-1.5 text-xs text-slate-200 cursor-pointer">
+            <input type="checkbox" id="onlyDiffCheckbox" checked onchange="renderTable()" class="rounded text-indigo-600 focus:ring-0">
+            <span>Show Only Discrepancies (Diff ≠ 0)</span>
+          </label>
+          <div class="relative w-56">
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-400 text-xs"></i>
+            <input type="text" id="searchInput" oninput="renderTable()" placeholder="Search Company or Invoice..." class="w-full pl-8 pr-3 py-1 text-xs rounded bg-slate-800 border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400">
+          </div>
         </div>
       </div>
 
-      <!-- FILTER TABS & SEARCH -->
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div class="flex flex-wrap gap-2" id="filterTabs">
-            <button onclick="setFilter('ALL')" class="filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white transition">All Parties (<span id="countAll">0</span>)</button>
-            <button onclick="setFilter('TAX_MISMATCH')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-amber-100 transition">Tax Mismatch (<span id="countMismatch">0</span>)</button>
-            <button onclick="setFilter('MISSING_IN_GSTR2B')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-rose-100 transition">Missing in 2B (<span id="countMissing2b">0</span>)</button>
-            <button onclick="setFilter('MISSING_IN_TALLY')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-100 transition">Missing in Tally (<span id="countMissingTally">0</span>)</button>
-            <button onclick="setFilter('CREDIT_REVERSAL')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-purple-100 transition">Reversals / Credit (<span id="countReversal">0</span>)</button>
-            <button onclick="setFilter('MATCHED')" class="filter-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-emerald-100 transition">Matched (<span id="countMatchedTab">0</span>)</button>
-          </div>
-
-          <div class="w-full md:w-72 relative">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-            <input type="text" id="searchInput" oninput="renderTable()" placeholder="Search Party or GSTIN..." class="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          </div>
-        </div>
-
-        <!-- PARTY DETAILS TABLE -->
-        <div class="overflow-x-auto rounded-xl border border-slate-200">
+      <!-- MAIN DISCREPANCY TABLE -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
           <table class="w-full text-left border-collapse text-xs">
-            <thead class="bg-slate-100 text-slate-700 uppercase font-semibold text-[11px] border-b border-slate-200">
+            <thead class="bg-slate-100 text-slate-700 uppercase font-bold text-[11px] border-b border-slate-200">
               <tr>
-                <th class="py-3 px-3">Status</th>
-                <th class="py-3 px-3">Party Name (Tally / 2B)</th>
-                <th class="py-3 px-3">Supplier GSTIN</th>
-                <th class="py-3 px-3 text-right">Tax in GSTR-2B</th>
-                <th class="py-3 px-3 text-right">Tax in Tally</th>
-                <th class="py-3 px-3 text-right">Difference</th>
-                <th class="py-3 px-4">Explanation & Action Required (Reason)</th>
-                <th class="py-3 px-3 text-center">Invoices</th>
+                <th class="py-2.5 px-3 w-10 text-center">#</th>
+                <th class="py-2.5 px-3">Company Name</th>
+                <th class="py-2.5 px-3">Invoice / Vch No</th>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3 text-right">Tax in 2B (₹)</th>
+                <th class="py-2.5 px-3 text-right">Tax in Books (₹)</th>
+                <th class="py-2.5 px-3 text-right">Difference (₹)</th>
+                <th class="py-2.5 px-3">Reason / Remarks</th>
               </tr>
             </thead>
-            <tbody id="partyTableBody" class="divide-y divide-slate-100 font-medium">
+            <tbody id="discrepancyTableBody" class="divide-y divide-slate-100">
               <!-- Dynamically Populated -->
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <!-- INVOICE LEVEL MODAL / DRAWER -->
-      <div id="invoiceModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-          <div class="p-4 bg-slate-900 text-white flex justify-between items-center">
-            <h3 class="font-bold text-sm" id="modalTitle">Invoice Drilldown</h3>
-            <button onclick="closeModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-          <div class="p-4 overflow-y-auto flex-1">
-            <table class="w-full text-left text-xs">
-              <thead class="bg-slate-100 text-slate-600 font-semibold uppercase text-[10px]">
-                <tr>
-                  <th class="p-2">Status</th>
-                  <th class="p-2">Invoice No (2B)</th>
-                  <th class="p-2">Voucher No (Tally)</th>
-                  <th class="p-2 text-right">Tax in 2B</th>
-                  <th class="p-2 text-right">Tax in Tally</th>
-                  <th class="p-2 text-right">Diff</th>
-                  <th class="p-2">Match Logic</th>
-                </tr>
-              </thead>
-              <tbody id="modalTableBody" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
         </div>
       </div>
 
@@ -225,8 +157,7 @@
   </main>
 
   <script>
-    let globalData = null;
-    let currentFilter = 'ALL';
+    let globalResults = null;
 
     const formatCurrency = (val) => {
       const num = Number(val) || 0;
@@ -292,7 +223,7 @@
           break;
         }
       }
-      if (headerIdx === -1) throw new Error("Could not locate GSTR-2B B2B table header in the uploaded file.");
+      if (headerIdx === -1) throw new Error("Could not locate GSTR-2B B2B table header in file.");
 
       const records = [];
       for (let i = headerIdx + 2; i < rows.length; i++) {
@@ -313,30 +244,26 @@
         const tradeName = String(r[1] || '').trim();
         const invNo = String(r[2] || '').trim();
         const invDate = String(r[4] || '').trim();
-        const taxableVal = parseNum(r[8]);
         const igst = parseNum(r[9]);
         const cgst = parseNum(r[10]);
         const sgst = parseNum(r[11]);
-        const cess = parseNum(r[12]);
 
         let targetTax = igst;
         if (mode === 'cgst_sgst') targetTax = cgst + sgst;
         else if (mode === 'total') targetTax = igst + cgst + sgst;
 
-        records.push({
-          gstin,
-          party_name: tradeName,
-          party_norm: normalizePartyName(tradeName),
-          invoice_no: invNo,
-          invoice_no_clean: cleanInvoiceNo(invNo),
-          invoice_date: invDate,
-          taxable_val: taxableVal,
-          igst,
-          cgst,
-          sgst,
-          cess,
-          target_tax: targetTax
-        });
+        if (targetTax !== 0) {
+          records.push({
+            id: i,
+            gstin,
+            party_name: tradeName,
+            party_norm: normalizePartyName(tradeName),
+            invoice_no: invNo,
+            invoice_no_clean: cleanInvoiceNo(invNo),
+            date: invDate,
+            tax: targetTax
+          });
+        }
       }
       return records;
     }
@@ -353,7 +280,7 @@
           break;
         }
       }
-      if (headerIdx === -1) throw new Error("Could not locate Tally ledger table header in the uploaded file.");
+      if (headerIdx === -1) throw new Error("Could not locate Tally ledger header in file.");
 
       const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
       const colMap = {};
@@ -392,10 +319,11 @@
         const debit = parseNum(r[colMap['debit']]);
         const credit = parseNum(r[colMap['credit']]);
 
-        const isCreditReversal = (credit > 0 && debit === 0);
+        const isCredit = (credit > 0 && debit === 0);
         const taxAmount = debit > 0 ? debit : -credit;
 
         records.push({
+          id: i,
           date,
           party_name: party,
           party_norm: normalizePartyName(party),
@@ -404,296 +332,128 @@
           vch_no_clean: cleanInvoiceNo(vchNo),
           debit,
           credit,
-          tax_amount: taxAmount,
-          is_credit_reversal: isCreditReversal
+          tax: taxAmount,
+          is_credit: isCredit
         });
       }
       return records;
     }
 
-    function runReconciliation(df2b, dfTally, mode, tolerance = 1.0) {
-      const df2bFiltered = df2b.filter(r => r.target_tax > 0);
-      
-      // Group GSTR-2B by party_norm
-      const p2bMap = {};
-      df2bFiltered.forEach(r => {
-        const k = r.party_norm;
-        if (!p2bMap[k]) {
-          p2bMap[k] = {
-            party_norm: k,
-            party_name: r.party_name,
-            gstins: new Set([r.gstin]),
-            total_tax_2b: 0,
-            invoices_2b: []
-          };
-        }
-        p2bMap[k].gstins.add(r.gstin);
-        p2bMap[k].total_tax_2b += r.target_tax;
-        p2bMap[k].invoices_2b.push(r.invoice_no);
-      });
-
-      // Group Tally Debits & Credits
-      const ptallyMap = {};
-      const tallyCredits = [];
-
-      dfTally.forEach(r => {
-        if (r.is_credit_reversal) {
-          tallyCredits.push(r);
-          return;
-        }
-        const k = r.party_norm;
-        if (!ptallyMap[k]) {
-          ptallyMap[k] = {
-            party_norm: k,
-            party_names: new Set([r.party_name]),
-            total_tax_tally: 0,
-            vouchers_tally: []
-          };
-        }
-        ptallyMap[k].party_names.add(r.party_name);
-        ptallyMap[k].total_tax_tally += r.debit;
-        ptallyMap[k].vouchers_tally.push(r.vch_no);
-      });
-
-      const p2bList = Object.values(p2bMap);
-      const ptallyList = Object.values(ptallyMap);
-
-      const matched2b = new Set();
-      const matchedTally = new Set();
-      const partyRows = [];
-
-      // Pass 1: Exact party_norm
-      p2bList.forEach((r2b, i) => {
-        ptallyList.forEach((rt, j) => {
-          if (matchedTally.has(j)) return;
-          if (r2b.party_norm && rt.party_norm && r2b.party_norm === rt.party_norm) {
-            matched2b.add(i);
-            matchedTally.add(j);
-            partyRows.push(buildPartyRow(r2b, rt, tolerance));
-          }
-        });
-      });
-
-      // Pass 2: Remaining in GSTR-2B only
-      p2bList.forEach((r2b, i) => {
-        if (!matched2b.has(i)) {
-          partyRows.push({
-            party_name_2b: r2b.party_name,
-            party_name_tally: '--- Not Found in Tally ---',
-            gstin: Array.from(r2b.gstins).join(', '),
-            tax_gstr2b: r2b.total_tax_2b,
-            tax_tally: 0.0,
-            difference: r2b.total_tax_2b,
-            status: 'MISSING_IN_TALLY',
-            status_label: 'Missing in Tally (Bill Unrecorded)',
-            reason: `Tax of ₹${r2b.total_tax_2b.toLocaleString('en-IN', {minimumFractionDigits:2})} is available in GSTR-2B but unrecorded in Tally books. (Action: Accounts team should record invoice to claim ITC).`,
-            invoices_2b: r2b.invoices_2b.join(', '),
-            vouchers_tally: ''
-          });
-        }
-      });
-
-      // Pass 3: Remaining in Tally only
-      ptallyList.forEach((rt, j) => {
-        if (!matchedTally.has(j)) {
-          partyRows.push({
-            party_name_2b: '--- Not Found in GSTR-2B ---',
-            party_name_tally: Array.from(rt.party_names).join(' / '),
-            gstin: '---',
-            tax_gstr2b: 0.0,
-            tax_tally: rt.total_tax_tally,
-            difference: -rt.total_tax_tally,
-            status: 'MISSING_IN_GSTR2B',
-            status_label: 'Missing in GSTR-2B (Vendor GSTR-1 Pending)',
-            reason: `Tax of ₹${rt.total_tax_tally.toLocaleString('en-IN', {minimumFractionDigits:2})} is booked in Tally but not reflected in GSTR-2B. (Action: Supplier has not filed GSTR-1 or filed with incorrect GSTIN; follow up with vendor).`,
-            invoices_2b: '',
-            vouchers_tally: rt.vouchers_tally.join(', ')
-          });
-        }
-      });
-
-      // Pass 4: Credit Reversals
-      tallyCredits.forEach(rc => {
-        partyRows.push({
-          party_name_2b: '---',
-          party_name_tally: rc.party_name,
-          gstin: '---',
-          tax_gstr2b: 0.0,
-          tax_tally: -rc.credit,
-          difference: rc.credit,
-          status: 'CREDIT_REVERSAL',
-          status_label: 'Credit / Tax Reversal in Tally',
-          reason: `Credit entry of ₹${rc.credit.toLocaleString('en-IN', {minimumFractionDigits:2})} in Tally (${rc.vch_type} - Vch ${rc.vch_no}). Represents a tax reversal or sales adjustment, not an inward purchase supply.`,
-          invoices_2b: '',
-          vouchers_tally: rc.vch_no
-        });
-      });
-
-      // Sort
-      const priorityMap = { 'MISSING_IN_GSTR2B': 1, 'MISSING_IN_TALLY': 2, 'TAX_MISMATCH': 3, 'CREDIT_REVERSAL': 4, 'MATCHED': 5 };
-      partyRows.sort((a, b) => (priorityMap[a.status] || 9) - (priorityMap[b.status] || 9) || b.difference - a.difference);
-
-      // Summary
-      const total2b = df2bFiltered.reduce((sum, r) => sum + r.target_tax, 0);
-      const totalTallyDebit = dfTally.filter(r => !r.is_credit_reversal).reduce((sum, r) => sum + r.debit, 0);
-      const totalTallyCredit = tallyCredits.reduce((sum, r) => sum + r.credit, 0);
-      const netTally = totalTallyDebit - totalTallyCredit;
-
-      // Invoice level drilldown
-      const invoiceDetails = buildInvoiceDetails(df2bFiltered, dfTally, tolerance);
-
-      return {
-        summary: {
-          reconciliation_mode: mode.toUpperCase(),
-          total_gstr2b_tax: total2b,
-          total_tally_debit_tax: totalTallyDebit,
-          total_tally_credit_tax: totalTallyCredit,
-          net_tally_tax: netTally,
-          net_difference: total2b - netTally,
-          total_parties_analyzed: partyRows.length,
-          count_matched: partyRows.filter(p => p.status === 'MATCHED').length,
-          count_mismatch: partyRows.filter(p => p.status === 'TAX_MISMATCH').length,
-          count_missing_in_gstr2b: partyRows.filter(p => p.status === 'MISSING_IN_GSTR2B').length,
-          count_missing_in_tally: partyRows.filter(p => p.status === 'MISSING_IN_TALLY').length
-        },
-        party_summary: partyRows,
-        invoice_details: invoiceDetails
-      };
-    }
-
-    function buildPartyRow(r2b, rt, tolerance) {
-      const tax2b = r2b.total_tax_2b;
-      const taxTally = rt.total_tax_tally;
-      const diff = Math.round((tax2b - taxTally) * 100) / 100;
-      let status = 'MATCHED';
-      let statusLabel = 'Matched (Exact / Within ₹1)';
-      let reason = `Tax amounts match exactly across both records (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}).`;
-
-      if (Math.abs(diff) > tolerance) {
-        status = 'TAX_MISMATCH';
-        statusLabel = 'Tax Amount Mismatch';
-        if (diff > 0) {
-          reason = `GSTR-2B tax (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}) exceeds Tally books (₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})}). Unbooked ITC variance: ₹${diff.toLocaleString('en-IN', {minimumFractionDigits:2})}.`;
-        } else {
-          reason = `Tally tax claimed (₹${taxTally.toLocaleString('en-IN', {minimumFractionDigits:2})}) exceeds GSTR-2B reflection (₹${tax2b.toLocaleString('en-IN', {minimumFractionDigits:2})}). Variance: ₹${Math.abs(diff).toLocaleString('en-IN', {minimumFractionDigits:2})}. (Action: Reconcile with supplier or adjust ITC in GSTR-3B).`;
-        }
-      }
-
-      return {
-        party_name_2b: r2b.party_name,
-        party_name_tally: Array.from(rt.party_names).join(' / '),
-        gstin: Array.from(r2b.gstins).join(', '),
-        tax_gstr2b: tax2b,
-        tax_tally: taxTally,
-        difference: diff,
-        status: status,
-        status_label: statusLabel,
-        reason: reason,
-        invoices_2b: r2b.invoices_2b.join(', '),
-        vouchers_tally: rt.vouchers_tally.join(', ')
-      };
-    }
-
-    function buildInvoiceDetails(df2b, dfTally, tolerance) {
-      const rows = [];
+    function reconcileEntries(df2b, dfTally, tolerance = 1.0) {
       const tallyUsed = new Set();
+      const matched2b = new Set();
+      const allRows = [];
 
+      // Pass 1: Match by Invoice Number + Amount
       df2b.forEach(r2 => {
         const invClean = r2.invoice_no_clean;
-        const amt2b = r2.target_tax;
-        let matchFound = false;
-
-        // Condition A: Clean invoice number match
+        if (!invClean) return;
         for (let j = 0; j < dfTally.length; j++) {
           if (tallyUsed.has(j)) continue;
           const rt = dfTally[j];
-          if (invClean && rt.vch_no_clean && invClean === rt.vch_no_clean) {
-            const diff = Math.round((amt2b - rt.debit) * 100) / 100;
-            rows.push({
-              party_2b: r2.party_name,
-              party_tally: rt.party_name,
-              invoice_2b: r2.invoice_no,
-              vch_no_tally: rt.vch_no,
-              tax_2b: amt2b,
-              tax_tally: rt.debit,
-              difference: diff,
-              match_type: 'Invoice Number Match',
-              status: Math.abs(diff) <= tolerance ? 'MATCHED' : 'AMOUNT_MISMATCH'
-            });
+          if (rt.vch_no_clean && invClean === rt.vch_no_clean && Math.abs(r2.tax - rt.debit) <= tolerance) {
             tallyUsed.add(j);
-            matchFound = true;
+            matched2b.add(r2.id);
+            allRows.push({
+              company: r2.party_name,
+              invoice_no: r2.invoice_no,
+              date: r2.date || rt.date,
+              tax_2b: r2.tax,
+              tax_books: rt.debit,
+              difference: 0,
+              reason: 'ok',
+              is_matched: true
+            });
             break;
           }
         }
+      });
 
-        // Condition B: Party + Amount Match
-        if (!matchFound) {
-          for (let j = 0; j < dfTally.length; j++) {
-            if (tallyUsed.has(j)) continue;
-            const rt = dfTally[j];
-            if (Math.abs(amt2b - rt.debit) <= tolerance && r2.party_norm === rt.party_norm) {
-              rows.push({
-                party_2b: r2.party_name,
-                party_tally: rt.party_name,
-                invoice_2b: r2.invoice_no,
-                vch_no_tally: rt.vch_no,
-                tax_2b: amt2b,
-                tax_tally: rt.debit,
-                difference: 0,
-                match_type: 'Party + Amount Match (Vch No differs)',
-                status: 'MATCHED'
-              });
-              tallyUsed.add(j);
-              matchFound = true;
-              break;
-            }
+      // Pass 2: Match by Party + Amount
+      df2b.forEach(r2 => {
+        if (matched2b.has(r2.id)) return;
+        for (let j = 0; j < dfTally.length; j++) {
+          if (tallyUsed.has(j)) continue;
+          const rt = dfTally[j];
+          if (r2.party_norm === rt.party_norm && Math.abs(r2.tax - rt.debit) <= tolerance) {
+            tallyUsed.add(j);
+            matched2b.add(r2.id);
+            allRows.push({
+              company: r2.party_name,
+              invoice_no: r2.invoice_no || rt.vch_no,
+              date: r2.date || rt.date,
+              tax_2b: r2.tax,
+              tax_books: rt.debit,
+              difference: 0,
+              reason: 'ok',
+              is_matched: true
+            });
+            break;
           }
         }
+      });
 
-        if (!matchFound) {
-          rows.push({
-            party_2b: r2.party_name,
-            party_tally: '---',
-            invoice_2b: r2.invoice_no,
-            vch_no_tally: '---',
-            tax_2b: amt2b,
-            tax_tally: 0,
-            difference: amt2b,
-            match_type: 'Not in Tally',
-            status: 'MISSING_IN_TALLY'
+      // Pass 3: Unmatched in GSTR-2B (Not Recorded in Books)
+      df2b.forEach(r2 => {
+        if (!matched2b.has(r2.id)) {
+          allRows.push({
+            company: r2.party_name,
+            invoice_no: r2.invoice_no,
+            date: r2.date,
+            tax_2b: r2.tax,
+            tax_books: 0,
+            difference: Math.round(r2.tax * 100) / 100,
+            reason: 'Not Recorded in Books',
+            is_matched: false
           });
         }
       });
 
-      // Remaining Tally entries
+      // Pass 4: Unmatched in Books (Not Reflected in GSTR-2B or Credit Entry)
       dfTally.forEach((rt, j) => {
         if (!tallyUsed.has(j)) {
-          rows.push({
-            party_2b: '---',
-            party_tally: rt.party_name,
-            invoice_2b: '---',
-            vch_no_tally: rt.vch_no,
-            tax_2b: 0,
-            tax_tally: rt.debit > 0 ? rt.debit : -rt.credit,
-            difference: rt.debit > 0 ? -rt.debit : rt.credit,
-            match_type: 'Not in GSTR-2B',
-            status: rt.credit > 0 ? 'CREDIT_REVERSAL' : 'MISSING_IN_GSTR2B'
-          });
+          if (rt.is_credit) {
+            allRows.push({
+              company: rt.party_name,
+              invoice_no: rt.vch_no,
+              date: rt.date,
+              tax_2b: 0,
+              tax_books: -rt.credit,
+              difference: Math.round(rt.credit * 100) / 100,
+              reason: 'Credit / Adjustment in Books',
+              is_matched: false
+            });
+          } else {
+            allRows.push({
+              company: rt.party_name,
+              invoice_no: rt.vch_no,
+              date: rt.date,
+              tax_2b: 0,
+              tax_books: rt.debit,
+              difference: Math.round(-rt.debit * 100) / 100,
+              reason: 'Not Reflected in GSTR-2B',
+              is_matched: false
+            });
+          }
         }
       });
 
-      return rows;
-    }
-
-    function setFilter(filter) {
-      currentFilter = filter;
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('bg-slate-900', 'text-white');
-        btn.classList.add('bg-slate-100', 'text-slate-700');
+      // Sort discrepancies first
+      allRows.sort((a, b) => {
+        if (a.is_matched !== b.is_matched) return a.is_matched ? 1 : -1;
+        return Math.abs(b.difference) - Math.abs(a.difference);
       });
-      event.target.classList.remove('bg-slate-100', 'text-slate-700');
-      event.target.classList.add('bg-slate-900', 'text-white');
-      renderTable();
+
+      const discRows = allRows.filter(r => !r.is_matched);
+      const matchedRows = allRows.filter(r => r.is_matched);
+      const netDiff = allRows.reduce((sum, r) => sum + r.difference, 0);
+
+      return {
+        all_rows: allRows,
+        discrepancies: discRows,
+        matched: matchedRows,
+        net_diff: Math.round(netDiff * 100) / 100
+      };
     }
 
     async function processFiles() {
@@ -701,7 +461,7 @@
       const tallyInput = document.getElementById('tallyFileInput').files[0];
 
       if (!gstr2bInput || !tallyInput) {
-        alert("Please upload both files (GSTR-2B and Tally), or click 'Load October 2026 Sample Data'.");
+        alert("Please upload both GSTR-2B and Tally files, or click 'Load October 2026 Sample Data'.");
         return;
       }
 
@@ -719,11 +479,11 @@
         const df2b = parseGSTR2BFromWorkbook(wb2b, mode);
         const dfTally = parseTallyFromWorkbook(wbTally);
 
-        const results = runReconciliation(df2b, dfTally, mode);
-        globalData = results;
+        const results = reconcileEntries(df2b, dfTally);
+        globalResults = results;
         displayResults(results);
       } catch (err) {
-        alert("Error while processing files: " + err.message);
+        alert("Error while reconciling files: " + err.message);
         console.error(err);
       } finally {
         document.getElementById('loadingBox').classList.add('hidden');
@@ -747,8 +507,8 @@
         const df2b = parseGSTR2BFromWorkbook(wb2b, mode);
         const dfTally = parseTallyFromWorkbook(wbTally);
 
-        const results = runReconciliation(df2b, dfTally, mode);
-        globalData = results;
+        const results = reconcileEntries(df2b, dfTally);
+        globalResults = results;
         displayResults(results);
       } catch (err) {
         alert("Failed to load sample data: " + err.message);
@@ -758,182 +518,83 @@
       }
     }
 
-    function displayResults(data) {
+    function displayResults(res) {
       document.getElementById('resultsSection').classList.remove('hidden');
       document.getElementById('downloadBtn').classList.remove('hidden');
 
-      const s = data.summary;
-      document.getElementById('kpi2bTax').innerText = formatCurrency(s.total_gstr2b_tax);
-      document.getElementById('kpiTallyTax').innerText = formatCurrency(s.total_tally_debit_tax);
-      document.getElementById('kpiDiff').innerText = formatCurrency(s.net_difference);
-      document.getElementById('kpiMatched').innerText = s.count_matched;
-      document.getElementById('kpiMismatch').innerText = s.count_mismatch;
-      document.getElementById('kpiMissing2b').innerText = s.count_missing_in_gstr2b;
-
-      // Update Tab Counts
-      const parties = data.party_summary;
-      document.getElementById('countAll').innerText = parties.length;
-      document.getElementById('countMismatch').innerText = parties.filter(p => p.status === 'TAX_MISMATCH').length;
-      document.getElementById('countMissing2b').innerText = parties.filter(p => p.status === 'MISSING_IN_GSTR2B').length;
-      document.getElementById('countMissingTally').innerText = parties.filter(p => p.status === 'MISSING_IN_TALLY').length;
-      document.getElementById('countReversal').innerText = parties.filter(p => p.status === 'CREDIT_REVERSAL').length;
-      document.getElementById('countMatchedTab').innerText = parties.filter(p => p.status === 'MATCHED').length;
+      document.getElementById('statDiscCount').innerText = res.discrepancies.length;
+      document.getElementById('statNetDiff').innerText = formatCurrency(res.net_diff);
+      document.getElementById('statMatchedCount').innerText = res.matched.length;
 
       renderTable();
     }
 
     function renderTable() {
-      if (!globalData) return;
-      const tbody = document.getElementById('partyTableBody');
+      if (!globalResults) return;
+      const tbody = document.getElementById('discrepancyTableBody');
       tbody.innerHTML = '';
 
+      const onlyDiff = document.getElementById('onlyDiffCheckbox').checked;
       const query = document.getElementById('searchInput').value.toLowerCase().trim();
 
-      const filtered = globalData.party_summary.filter(r => {
-        const matchesFilter = (currentFilter === 'ALL') || (r.status === currentFilter);
-        const searchStr = (r.party_name_tally + " " + r.party_name_2b + " " + (r.gstin || "")).toLowerCase();
-        const matchesSearch = !query || searchStr.includes(query);
-        return matchesFilter && matchesSearch;
+      const sourceList = onlyDiff ? globalResults.discrepancies : globalResults.all_rows;
+
+      const filtered = sourceList.filter(r => {
+        const text = (r.company + ' ' + (r.invoice_no || '') + ' ' + r.reason).toLowerCase();
+        return !query || text.includes(query);
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-slate-400">No parties match the selected filter.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400 font-medium">No records match the current filter.</td></tr>`;
         return;
       }
 
       filtered.forEach((r, idx) => {
         const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50/80 transition";
+        tr.className = "hover:bg-slate-50 transition";
 
         let badgeClass = 'badge-matched';
-        if (r.status === 'TAX_MISMATCH') badgeClass = 'badge-mismatch';
-        else if (r.status === 'MISSING_IN_GSTR2B') badgeClass = 'badge-missing-2b';
-        else if (r.status === 'MISSING_IN_TALLY') badgeClass = 'badge-missing-tally';
-        else if (r.status === 'CREDIT_REVERSAL') badgeClass = 'badge-reversal';
-
-        const displayName = r.party_name_tally !== '--- Not Found in Tally ---' ? r.party_name_tally : r.party_name_2b;
-        const subName = (r.party_name_2b && r.party_name_2b !== displayName) ? `<div class="text-[10px] text-slate-400">2B: ${r.party_name_2b}</div>` : '';
+        if (r.reason === 'Not Recorded in Books') badgeClass = 'badge-not-in-books';
+        else if (r.reason === 'Not Reflected in GSTR-2B') badgeClass = 'badge-not-in-2b';
+        else if (r.reason.includes('Credit') || r.reason.includes('Adjustment')) badgeClass = 'badge-reversal';
 
         tr.innerHTML = `
-          <td class="py-3 px-3 whitespace-nowrap">
-            <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold ${badgeClass}">
-              ${r.status_label}
+          <td class="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">${idx + 1}</td>
+          <td class="py-2.5 px-3 font-semibold text-slate-900">${r.company}</td>
+          <td class="py-2.5 px-3 font-mono text-[11px] text-slate-600">${r.invoice_no || '---'}</td>
+          <td class="py-2.5 px-3 text-slate-500 whitespace-nowrap text-[11px]">${r.date || '---'}</td>
+          <td class="py-2.5 px-3 text-right font-medium text-blue-700">${r.tax_2b ? formatCurrency(r.tax_2b) : '---'}</td>
+          <td class="py-2.5 px-3 text-right font-medium text-slate-700">${r.tax_books ? formatCurrency(r.tax_books) : '---'}</td>
+          <td class="py-2.5 px-3 text-right font-bold ${r.difference !== 0 ? (r.difference > 0 ? 'text-blue-600' : 'text-rose-600') : 'text-emerald-600'}">
+            ${r.difference !== 0 ? formatCurrency(r.difference) : '0.00'}
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${badgeClass}">
+              ${r.reason}
             </span>
-          </td>
-          <td class="py-3 px-3">
-            <div class="font-bold text-slate-800">${displayName}</div>
-            ${subName}
-          </td>
-          <td class="py-3 px-3 font-mono text-[11px] text-slate-600">${r.gstin || '---'}</td>
-          <td class="py-3 px-3 text-right font-semibold text-blue-700">${formatCurrency(r.tax_gstr2b)}</td>
-          <td class="py-3 px-3 text-right font-semibold text-indigo-700">${formatCurrency(r.tax_tally)}</td>
-          <td class="py-3 px-3 text-right font-bold ${Math.abs(r.difference) > 1 ? 'text-rose-600' : 'text-slate-500'}">
-            ${formatCurrency(r.difference)}
-          </td>
-          <td class="py-3 px-4 text-slate-600 max-w-md">
-            ${r.reason}
-          </td>
-          <td class="py-3 px-3 text-center whitespace-nowrap">
-            <button onclick="viewInvoices('${escape(displayName)}')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition font-medium">
-              <i class="fa-solid fa-list-check"></i> View
-            </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    function viewInvoices(escapedName) {
-      const name = unescape(escapedName);
-      const invoices = globalData.invoice_details.filter(inv => 
-        (inv.party_tally && inv.party_tally.includes(name)) || 
-        (inv.party_2b && inv.party_2b.includes(name))
-      );
-
-      document.getElementById('modalTitle').innerText = `Invoice Drilldown: ${name} (${invoices.length} entries)`;
-      const modalBody = document.getElementById('modalTableBody');
-      modalBody.innerHTML = '';
-
-      if (invoices.length === 0) {
-        modalBody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">No invoice records found.</td></tr>`;
-      } else {
-        invoices.forEach(inv => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="p-2 font-bold ${inv.status === 'MATCHED' ? 'text-emerald-600' : 'text-rose-600'}">${inv.status}</td>
-            <td class="p-2 font-mono">${inv.invoice_2b || '---'}</td>
-            <td class="p-2 font-mono">${inv.vch_no_tally || '---'}</td>
-            <td class="p-2 text-right font-semibold text-blue-700">${formatCurrency(inv.tax_2b)}</td>
-            <td class="p-2 text-right font-semibold text-indigo-700">${formatCurrency(inv.tax_tally)}</td>
-            <td class="p-2 text-right font-bold text-slate-700">${formatCurrency(inv.difference)}</td>
-            <td class="p-2 text-slate-500 text-[11px]">${inv.match_type}</td>
-          `;
-          modalBody.appendChild(tr);
-        });
-      }
-
-      document.getElementById('invoiceModal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-      document.getElementById('invoiceModal').classList.add('hidden');
-    }
-
     function exportExcelReport() {
-      if (!globalData) return;
+      if (!globalResults) return;
       const wb = XLSX.utils.book_new();
 
-      // Sheet 1: Summary
-      const s = globalData.summary;
-      const summaryRows = [
-        ['Metric', 'Value'],
-        ['Reconciliation Mode', s.reconciliation_mode],
-        ['Total Tax in GSTR-2B (₹)', s.total_gstr2b_tax],
-        ['Total Input Tax Claimed in Tally (₹)', s.total_tally_debit_tax],
-        ['Tally Credit / Reversal Adjustments (₹)', s.total_tally_credit_tax],
-        ['Net Tax Claimed in Tally (₹)', s.net_tally_tax],
-        ['Net Difference (₹)', s.net_difference],
-        ['Total Parties Analyzed', s.total_parties_analyzed],
-        ['Parties Matched', s.count_matched],
-        ['Parties with Tax Mismatch', s.count_mismatch],
-        ['Parties Missing in GSTR-2B', s.count_missing_in_gstr2b],
-        ['Parties Missing in Tally', s.count_missing_in_tally]
-      ];
-      const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
-      XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
-
-      // Sheet 2: Party Reconciliation
-      const partyExport = globalData.party_summary.map(r => ({
-        'Status': r.status_label,
-        'Party Name (Tally)': r.party_name_tally,
-        'Party Name (GSTR-2B)': r.party_name_2b,
-        'Supplier GSTIN': r.gstin,
-        'Tax in GSTR-2B (₹)': r.tax_gstr2b,
-        'Tax in Tally (₹)': r.tax_tally,
+      const exportData = globalResults.all_rows.map(r => ({
+        'Company Name': r.company,
+        'Invoice / Voucher No': r.invoice_no,
+        'Date': r.date,
+        'Tax in GSTR-2B (₹)': r.tax_2b,
+        'Tax in Books (₹)': r.tax_books,
         'Difference (₹)': r.difference,
-        'Explanation & Action Required': r.reason,
-        'Invoices in GSTR-2B': r.invoices_2b,
-        'Vouchers in Tally': r.vouchers_tally
+        'Reason / Remarks': r.reason
       }));
-      const ws2 = XLSX.utils.json_to_sheet(partyExport);
-      XLSX.utils.book_append_sheet(wb, ws2, 'Party Reconciliation');
 
-      // Sheet 3: Invoice Drilldown
-      const invExport = globalData.invoice_details.map(r => ({
-        'Status': r.status,
-        'Party (Tally)': r.party_tally,
-        'Party (GSTR-2B)': r.party_2b,
-        'Invoice No (2B)': r.invoice_2b,
-        'Voucher No (Tally)': r.vch_no_tally,
-        'Tax in 2B (₹)': r.tax_2b,
-        'Tax in Tally (₹)': r.tax_tally,
-        'Difference (₹)': r.difference,
-        'Match Type': r.match_type
-      }));
-      const ws3 = XLSX.utils.json_to_sheet(invExport);
-      XLSX.utils.book_append_sheet(wb, ws3, 'Invoice Drilldown');
-
-      XLSX.writeFile(wb, 'GST_Reconciliation_Report.xlsx');
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, 'Reconciliation');
+      XLSX.writeFile(wb, 'GST_Reconciliation_Discrepancies.xlsx');
     }
   </script>
 </body>
